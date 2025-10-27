@@ -47,7 +47,7 @@ module.exports = (app, redisClient, authMiddleware) => {
             }
 
             const { studentId } = req.params;
-            const { subjectName } = req.body;
+            const { subjectName, grades } = req.body;
 
             // Get current units
             const units = await redisClient.get(`units:${studentId}`, 'json') || [];
@@ -60,13 +60,8 @@ module.exports = (app, redisClient, authMiddleware) => {
             // Create new subject with empty grades
             const newSubject = {
                 subjectName,
-                grades: {
-                    firstGrading: null,
-                    secondGrading: null,
-                    thirdGrading: null,
-                    fourthGrading: null
-                },
-                average: null
+                grades: grades,
+                average: (grades.firstGrading + grades.secondGrading + grades.thirdGrading + grades.fourthGrading) / 4
             };
 
             units.push(newSubject);
