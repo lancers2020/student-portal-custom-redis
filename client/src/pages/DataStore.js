@@ -40,6 +40,8 @@ const DataStore = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [openGradeDialog, setOpenGradeDialog] = useState(false);
+    // NEW STATE: Tracks if we are adding a new subject or editing existing grades
+    const [dialogMode, setDialogMode] = useState('add'); // 'add' or 'edit'
     const [formData, setFormData] = useState({
         subjectName: '',
         grades: {
@@ -85,10 +87,14 @@ const DataStore = () => {
         try {
             setLoading(true);
             setError('');
-            await academic.addSubjectForStudent(selectedStudent.id, { 
-                subjectName: formData.subjectName 
+            console.log(':::formData', formData);
+            const addingGrades = await academic.addSubjectForStudent(selectedStudent.id, { 
+                subjectName: formData.subjectName ,
+                grades: formData.grades
             });
-            await loadStudentGrades(selectedStudent.id);
+            console.log(':::addingGrades', addingGrades);
+            const gettingGrades = await loadStudentGrades(selectedStudent.id);
+            console.log(':::gettingGrades', gettingGrades);
             setOpenGradeDialog(false);
             setFormData({
                 subjectName: '',
@@ -107,11 +113,16 @@ const DataStore = () => {
         }
     };
 
-    const handleUpdateGrades = async (subject) => {
+    // Updated to accept the subject data from the form
+    const handleUpdateGrades = async (subjectData) => {
         try {
             setLoading(true);
             setError('');
-            await academic.updateStudentGrades(selectedStudent.id, subject.subjectName, formData.grades);
+            await academic.updateStudentGrades(
+                selectedStudent.id, 
+                subjectData.subjectName, // Use the subjectName from the data
+                subjectData.grades
+            );
             await loadStudentGrades(selectedStudent.id);
             setOpenGradeDialog(false);
             setSuccess('Grades updated successfully');
@@ -143,6 +154,7 @@ const DataStore = () => {
             subjectName: subject.subjectName,
             grades: { ...subject.grades }
         });
+        setDialogMode('edit'); // <-- Set mode to 'edit'
         setOpenGradeDialog(true);
     };
 
@@ -226,6 +238,7 @@ const DataStore = () => {
                                                         fourthGrading: ''
                                                     }
                                                 });
+                                                setDialogMode('add'); // <-- Set mode to 'add'
                                                 setOpenGradeDialog(true);
                                             }}
                                         >
@@ -328,10 +341,12 @@ const DataStore = () => {
             {/* Grade Dialog */}
             <Dialog open={openGradeDialog} onClose={() => setOpenGradeDialog(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    {formData.subjectName ? 'Edit Grades' : 'Add New Subject'}
+                    {/* Use dialogMode to set the title */}
+                    {dialogMode === 'edit' ? 'Edit Grades' : 'Add New Subject'}
                 </DialogTitle>
                 <DialogContent>
-                    {!formData.subjectName && (
+                    {/* Only show subject name input if in 'add' mode */}
+                    {dialogMode === 'add' && (
                         <TextField
                             autoFocus
                             margin="dense"
@@ -366,7 +381,8 @@ const DataStore = () => {
                 <DialogActions>
                     <Button onClick={() => setOpenGradeDialog(false)}>Cancel</Button>
                     <Button
-                        onClick={() => formData.subjectName ? handleUpdateGrades() : handleAddSubject()}
+                        // Use dialogMode to select the correct handler and pass formData
+                        onClick={() => dialogMode === 'edit' ? handleUpdateGrades(formData) : handleAddSubject()}
                         disabled={loading}
                     >
                         {loading ? 'Saving...' : 'Save'}
