@@ -22,7 +22,12 @@ import {
     Grid,
     Autocomplete,
     Chip,
-    ListItemIcon
+    ListItemIcon,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableRow
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -32,7 +37,14 @@ import {
     School as SchoolIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import { academic } from '../services/api';
+import { academic, classes as classesApi } from '../services/api';
+
+const calculateAverage = (grades) => {
+    if (!grades) return '-';
+    const validGrades = Object.values(grades).filter(g => g !== null);
+    if (validGrades.length === 0) return '-';
+    return (validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length).toFixed(2);
+};
 
 const Class = () => {
     const { user } = useAuth();
@@ -49,6 +61,16 @@ const Class = () => {
         students: []
     });
     const [openStudentDialog, setOpenStudentDialog] = useState(false);
+    const [openGradingDialog, setOpenGradingDialog] = useState(false);
+    const [selectedSubject, setSelectedSubject] = useState(null);
+    const [grades, setGrades] = useState({});
+    const [editingGrades, setEditingGrades] = useState(false);
+
+    const [subjectInput, setSubjectInput] = useState(formData.subjects.join(', '));
+
+    useEffect(() => {
+        setSubjectInput(formData.subjects.join(', '));
+    }, [formData.subjects]);
 
     useEffect(() => {
         if (!user) return;
@@ -62,7 +84,7 @@ const Class = () => {
 
     const loadClasses = async () => {
         try {
-            const response = await academic.getTeacherClasses(user.id);
+            const response = await classesApi.getTeacherClasses(user.id);
             setClasses(response.data);
         } catch (err) {
             setError('Failed to load classes');
@@ -71,7 +93,7 @@ const Class = () => {
 
     const loadAllStudents = async () => {
         try {
-            const response = await academic.getAllStudents();
+            const response = await academic.getStudents();
             setStudents(response.data);
         } catch (err) {
             setError('Failed to load students');
@@ -90,7 +112,7 @@ const Class = () => {
             }
             setLoading(true);
             setError('');
-            await academic.createClass({
+            await classesApi.createClass({
                 teacherId: user.id,
                 name: formData.name,
                 subjects: formData.subjects.map(s => ({ name: s })),
@@ -128,12 +150,62 @@ const Class = () => {
             }
             setLoading(true);
             setError('');
-            await academic.updateClassStudents(selectedClass.id, formData.students);
+            await classesApi.updateClassStudents(selectedClass.id, formData.students);
             await loadClasses();
             setOpenStudentDialog(false);
             setSuccess('Students updated successfully');
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to update students');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOpenGrading = async (classData, subject) => {
+        try {
+            setLoading(true);
+            setError('');
+            const gradePromises = classData.students.map(s => 
+                academic.getStudentGrades(s.id)
+            );
+            const allGradesResponses = await Promise.all(gradePromises);
+            const allGradeData = allGradesResponses.map(response => response.data);
+            const subjectGrades = {};
+            classData.students.forEach(student => {
+                const studentGrades = allGradeData.map(v => {
+                    return v.find(g => {
+                        return g.studentId === student.id && g.subjectName === subject.name;
+                    });
+                });
+                subjectGrades[student.id] = studentGrades[0]?.grades || null
+            });
+
+            
+            setGrades(subjectGrades);
+            setSelectedClass(classData);
+            setSelectedSubject(subject);
+            setOpenGradingDialog(true);
+        } catch (err) {
+            console.error('Error loading student grades:', err);
+            setError('Failed to load grades. Check API service.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateGrades = async () => {
+        try {
+            setLoading(true);
+            setError('');
+            await Promise.all(
+                Object.entries(grades).map(([studentId, studentGrades]) =>
+                    studentGrades && academic.updateStudentGrades(studentId, selectedSubject.name, studentGrades)
+                )
+            );
+            setSuccess('Grades updated successfully');
+            setEditingGrades(false);
+        } catch (err) {
+            setError('Failed to update grades');
         } finally {
             setLoading(false);
         }
@@ -148,7 +220,7 @@ const Class = () => {
             try {
                 setLoading(true);
                 setError('');
-                await academic.deleteClass(classId);
+                await classesApi.deleteClass(classId);
                 await loadClasses();
                 setSuccess('Class deleted successfully');
             } catch (err) {
@@ -213,7 +285,10 @@ const Class = () => {
                                         <Chip
                                             key={index}
                                             label={subject.name}
-                                            sx={{ mr: 1, mb: 1 }}
+                                            onClick={() => handleOpenGrading(classData, subject)}
+                                            sx={{ mr: 1, mb: 1, cursor: 'pointer' }}
+                                            color="primary"
+                                            variant="outlined"
                                         />
                                     ))}
                                 </Box>
@@ -255,11 +330,14 @@ const Class = () => {
                     <TextField
                         label="Subjects (comma-separated)"
                         fullWidth
-                        value={formData.subjects.join(', ')}
-                        onChange={(e) => setFormData({
-                            ...formData,
-                            subjects: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                        })}
+                        value={subjectInput} 
+                        onChange={(e) => setSubjectInput(e.target.value)} 
+                        onBlur={() => {
+                            setFormData({
+                                ...formData,
+                                subjects: subjectInput.split(',').map(s => s.trim()).filter(Boolean)
+                            });
+                        }}
                         helperText="Enter subject names separated by commas"
                         sx={{ mb: 2 }}
                     />
@@ -315,6 +393,100 @@ const Class = () => {
                     <Button onClick={() => setOpenStudentDialog(false)}>Cancel</Button>
                     <Button onClick={handleUpdateStudents} disabled={loading}>
                         {loading ? 'Updating...' : 'Update'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Grading Dialog */}
+            <Dialog 
+                open={openGradingDialog} 
+                onClose={() => {
+                    setOpenGradingDialog(false);
+                    setEditingGrades(false);
+                }}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        {selectedSubject?.name} - Grades
+                        <Button
+                            variant={editingGrades ? "contained" : "outlined"}
+                            color={editingGrades ? "success" : "primary"}
+                            onClick={() => {
+                                if (editingGrades) {
+                                    handleUpdateGrades();
+                                } else {
+                                    setEditingGrades(true);
+                                }
+                            }}
+                            disabled={loading}
+                        >
+                            {loading ? 'Processing...' : editingGrades ? 'Save Grades' : 'Edit Grades'}
+                        </Button>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 2 }}>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Student</TableCell>
+                                    <TableCell align="center">1st Grading</TableCell>
+                                    <TableCell align="center">2nd Grading</TableCell>
+                                    <TableCell align="center">3rd Grading</TableCell>
+                                    <TableCell align="center">4th Grading</TableCell>
+                                    <TableCell align="center">Final Grade</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {selectedClass?.students.map((student) => (
+                                    <TableRow key={student.id}>
+                                        <TableCell>{student.fullName}</TableCell>
+                                        {['firstGrading', 'secondGrading', 'thirdGrading', 'fourthGrading'].map((period) => (
+                                            <TableCell key={period} align="center">
+                                                {editingGrades ? (
+                                                    <TextField
+                                                        type="number"
+                                                        value={grades[student.id]?.[period] || ''}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value === '' ? null : Number(e.target.value);
+                                                            setGrades(prev => ({
+                                                                ...prev,
+                                                                [student.id]: {
+                                                                    ...prev[student.id],
+                                                                    [period]: value
+                                                                }
+                                                            }));
+                                                        }}
+                                                        InputProps={{
+                                                            inputProps: { min: 0, max: 100 }
+                                                        }}
+                                                        size="small"
+                                                        sx={{ width: 70 }}
+                                                    />
+                                                ) : (
+                                                    grades[student.id]?.[period] || '-'
+                                                )}
+                                            </TableCell>
+                                        ))}
+                                        <TableCell align="center">
+                                            {calculateAverage(grades[student.id])}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button 
+                        onClick={() => {
+                            setOpenGradingDialog(false);
+                            setEditingGrades(false);
+                        }}
+                    >
+                        Close
                     </Button>
                 </DialogActions>
             </Dialog>
