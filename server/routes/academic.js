@@ -27,12 +27,14 @@ module.exports = (app, redisClient, authMiddleware) => {
             const { studentId } = req.params;
 
             // Check permissions
-            if (req.user.role !== 'admin' && req.user.id !== studentId) {
+            if (req.user.role !== 'admin' && req.user.id !== studentId && req.user.role !== 'teacher') {
                 return res.status(403).json({ message: 'Unauthorized access to grades' });
             }
 
             const grades = await redisClient.get(`units:${studentId}`, 'json') || [];
-            res.json(grades);
+            console.log('❤️❤️❤️Fetched grades for student', studentId, ':', grades);
+            const withStudentId = grades.map(v => ({ ...v, studentId }));
+            res.json(withStudentId);
         } catch (error) {
             console.error('Grades fetch error:', error);
             res.status(500).json({ message: 'Failed to fetch grades' });
@@ -82,7 +84,7 @@ module.exports = (app, redisClient, authMiddleware) => {
     // Update student grades (admin only)
     app.put('/api/academic/students/:studentId/subjects/:subjectName/grades', authMiddleware, async (req, res) => {
         try {
-            if (req.user.role !== 'admin') {
+            if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
                 return res.status(403).json({ message: 'Only admins can update grades' });
             }
 
