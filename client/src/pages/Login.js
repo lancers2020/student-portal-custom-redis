@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
     const navigate = useNavigate();
+    const { user, loading: isAuthLoading } = useAuth();
     const { login } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
@@ -37,7 +38,16 @@ const Login = () => {
             setError('');
             setLoading(true);
             await login(formData);
-            navigate('/grades');
+            if (!isAuthLoading) {
+                if (user.role === 'admin') {
+                    navigate('/datastore');
+                } else if (user.role === 'teacher') {
+                    navigate('/class');
+                } else {
+                    // Default for students or general users
+                    navigate('/grades'); 
+                }
+            }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to login');
         } finally {

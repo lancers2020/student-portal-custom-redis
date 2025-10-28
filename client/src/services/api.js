@@ -72,4 +72,13 @@ export const organization = {
     getDepartmentMembers: (department) => api.get(`/organization/department/${department}`)
 };
 
+// Class management services
+export const classes = {
+    getTeacherClasses: () => api.get('/classes'),
+    createClass: (data) => api.post('/classes', data),
+    updateClassStudents: (classId, students) => api.put(`/classes/${classId}/students`, { students }),
+    deleteClass: (classId) => api.delete(`/classes/${classId}`),
+    getAllStudents: () => api.get('/students/all')
+};
+
 export default api;

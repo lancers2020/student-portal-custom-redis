@@ -16,8 +16,10 @@ module.exports = (app, redisClient, bcrypt, jwt, JWT_SECRET) => {
             // Hash password
             const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Default role to student if not provided
-            const userRole = role === 'admin' ? 'admin' : 'student';
+            // Set role based on provided value
+            let userRole = 'student'; // default
+            if (role === 'admin') userRole = 'admin';
+            if (role === 'teacher') userRole = 'teacher';
 
             // Create user profile
             const user = {
