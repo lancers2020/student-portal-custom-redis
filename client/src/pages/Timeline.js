@@ -30,9 +30,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 
 const reactionTypes = [
-    { type: 'like', icon: <ThumbUp />, color: 'primary' },
-    { type: 'love', icon: <Favorite />, color: 'error' },
-    { type: 'celebrate', icon: <Celebration />, color: 'success' }
+    { type: 'like', icon: <ThumbUp fontSize="small" />, color: 'primary' },
+    { type: 'love', icon: <Favorite fontSize="small" />, color: 'error' },
+    { type: 'celebrate', icon: <Celebration fontSize="small" />, color: 'success' }
 ];
 
 const Timeline = () => {
@@ -118,87 +118,125 @@ const Timeline = () => {
         }
     };
 
+    /**
+     * Helper function to group and count reactions
+     * @param {Array} reactions - The raw array of reactions from the post object
+     * @returns {Object} - An object with reaction types as keys and counts as values
+     */
+    const getReactionCounts = (reactions) => {
+        return reactions.reduce((acc, reaction) => {
+            acc[reaction.type] = (acc[reaction.type] || 0) + 1;
+            return acc;
+        }, {});
+    };
+
     return (
-        <Box>
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h5">University Timeline</Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setOpenDialog(true)}
-                >
-                    Create Post
-                </Button>
-            </Box>
+        <Box sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
+            {user?.role === 'admin' && (
+                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h5">University Timeline</Typography>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenDialog(true)}
+                    >
+                        Create Post
+                    </Button>
+                </Box>
+            )}
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
             <Grid container spacing={3}>
-                {posts.map((post) => (
-                    <Grid item xs={12} key={post.id}>
-                        <Card>
-                            <CardContent>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                                    <Typography variant="h6">{post.title}</Typography>
-                                    {user.id === post.author && (
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => handleDeletePost(post.id)}
-                                        >
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    )}
-                                </Box>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ mb: 2 }}
-                                >
-                                    Posted {formatDistanceToNow(new Date(post.createdAt))} ago
-                                </Typography>
-                                <Typography variant="body1" paragraph>
-                                    {post.content}
-                                </Typography>
-                                <Divider sx={{ my: 2 }} />
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {post.reactions.map((reaction, index) => (
-                                        <Chip
-                                            key={index}
-                                            icon={reactionTypes.find(r => r.type === reaction.type)?.icon}
-                                            label={reaction.type}
-                                            color={reactionTypes.find(r => r.type === reaction.type)?.color}
-                                            size="small"
-                                            onDelete={
-                                                reaction.userId === user.id
-                                                    ? () => handleRemoveReaction(post.id)
-                                                    : undefined
-                                            }
-                                        />
-                                    ))}
-                                </Box>
-                            </CardContent>
-                            <CardActions>
-                                {reactionTypes.map((reaction) => (
-                                    <Button
-                                        key={reaction.type}
-                                        size="small"
-                                        startIcon={reaction.icon}
-                                        color={reaction.color}
-                                        onClick={() => handleReaction(post.id, reaction.type)}
-                                        disabled={post.reactions.some(r => r.userId === user.id)}
+                {posts.map((post) => {
+                    const counts = getReactionCounts(post.reactions);
+                    // Find the reaction the current user has, if any
+                    const currentUserReaction = post.reactions.find(r => r.userId === user?.id);
+
+                    return (
+                        <Grid item xs={12} key={post.id}>
+                            <Card variant="outlined">
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                        <Typography variant="h6">{post.title}</Typography>
+                                        {user?.id === post.author && (
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => handleDeletePost(post.id)}
+                                                aria-label="Delete post"
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
+                                    </Box>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mb: 2 }}
                                     >
-                                        {reaction.type}
-                                    </Button>
-                                ))}
-                            </CardActions>
-                        </Card>
-                    </Grid>
-                ))}
+                                        {/* post.authorName */}
+                                        Posted **{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}** by **{post.author || 'Admin'}** 
+                                    </Typography>
+                                    <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-wrap' }}>
+                                        {post.content}
+                                    </Typography>
+
+                                    {/* 🌟 REACTION DISPLAY FIX 🌟 */}
+                                    <Divider sx={{ my: 2 }} />
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {reactionTypes.map((typeObj) => {
+                                            const count = counts[typeObj.type] || 0;
+                                            if (count === 0) return null;
+
+                                            return (
+                                                <Chip
+                                                    key={typeObj.type}
+                                                    icon={typeObj.icon}
+                                                    label={`${count}`} // Display the count
+                                                    color={typeObj.color}
+                                                    size="small"
+                                                    variant={currentUserReaction?.type === typeObj.type ? 'filled' : 'outlined'} // Highlight if current user reacted
+                                                    
+                                                    // Only allow delete if the count is from the current user's type
+                                                    onDelete={
+                                                        currentUserReaction?.type === typeObj.type
+                                                            ? () => handleRemoveReaction(post.id)
+                                                            : undefined
+                                                    }
+                                                    deleteIcon={currentUserReaction?.type === typeObj.type ? <DeleteIcon /> : undefined}
+                                                />
+                                            );
+                                        })}
+                                    </Box>
+                                </CardContent>
+                                
+                                <CardActions sx={{ borderTop: '1px solid #eee', pt: 1 }}>
+                                    {reactionTypes.map((reaction) => (
+                                        <Button
+                                            key={reaction.type}
+                                            size="small"
+                                            startIcon={reaction.icon}
+                                            color={reaction.color}
+                                            onClick={() => handleReaction(post.id, reaction.type)}
+                                            // Disable button if user has already reacted (any type)
+                                            disabled={!!currentUserReaction} 
+                                            // Highlight if this specific type is the user's current reaction
+                                            variant={currentUserReaction?.type === reaction.type ? 'contained' : 'text'}
+                                        >
+                                            {reaction.type.toUpperCase()}
+                                        </Button>
+                                    ))}
+                                </CardActions>
+                            </Card>
+                        </Grid>
+                    );
+                })}
             </Grid>
 
             {/* Create Post Dialog */}
-            <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
+            <Dialog open={openDialog} onClose={() => setOpenDialog(false)} fullWidth maxWidth="sm">
                 <DialogTitle>Create New Post</DialogTitle>
                 <DialogContent>
                     <TextField
@@ -209,20 +247,22 @@ const Timeline = () => {
                         value={formData.title}
                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         sx={{ mb: 2 }}
+                        variant="outlined"
                     />
                     <TextField
                         fullWidth
                         label="Content"
                         multiline
-                        rows={4}
+                        rows={6} // Increased rows for better content editing
                         value={formData.content}
                         onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                        variant="outlined"
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-                    <Button onClick={handleAddPost} disabled={loading}>
-                        {loading ? 'Creating...' : 'Create'}
+                    <Button onClick={() => setOpenDialog(false)} color="inherit">Cancel</Button>
+                    <Button onClick={handleAddPost} disabled={loading} variant="contained">
+                        {loading ? 'Creating...' : 'Create Post'}
                     </Button>
                 </DialogActions>
             </Dialog>

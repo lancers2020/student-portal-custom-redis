@@ -54,7 +54,8 @@ module.exports = (app, redisClient, bcrypt, jwt, JWT_SECRET) => {
                     {
                         id: 'member_1',
                         name: 'Dr. Alice Smith',
-                        description: 'University President',
+                        // REVISED DESCRIPTION
+                        description: 'Chief Executive and Strategic Lead for University Governance and Planning.',
                         role: 'President',
                         department: 'Administration',
                         tenurityYears: 10,
@@ -63,7 +64,8 @@ module.exports = (app, redisClient, bcrypt, jwt, JWT_SECRET) => {
                     {
                         id: 'member_2',
                         name: 'Prof. Bob Johnson',
-                        description: 'Dean of Engineering',
+                        // REVISED DESCRIPTION
+                        description: 'Oversees academic programs, research initiatives, and faculty development within the School of Engineering.',
                         role: 'Dean',
                         department: 'Engineering',
                         tenurityYears: 7,
@@ -72,7 +74,8 @@ module.exports = (app, redisClient, bcrypt, jwt, JWT_SECRET) => {
                     {
                         id: 'member_3',
                         name: 'Ms. Carol Lee',
-                        description: 'Registrar',
+                        // REVISED DESCRIPTION
+                        description: 'Manages student academic records, course registration, and graduation processes.',
                         role: 'Registrar',
                         department: 'Administration',
                         tenurityYears: 5,
@@ -81,7 +84,8 @@ module.exports = (app, redisClient, bcrypt, jwt, JWT_SECRET) => {
                     {
                         id: 'member_4',
                         name: 'Dr. David Kim',
-                        description: 'Faculty Member',
+                        // REVISED DESCRIPTION
+                        description: 'Senior Lecturer specializing in theoretical physics and curriculum development.',
                         role: 'Faculty',
                         department: 'Science',
                         tenurityYears: 3,

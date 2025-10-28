@@ -21,6 +21,7 @@ module.exports = (app, redisClient, authMiddleware) => {
     app.post('/api/timeline', authMiddleware, async (req, res) => {
         try {
             const { title, content } = req.body;
+            console.log('🌐🌐🌐🌐req.user.', req.user);
             
             // In a real app, check if user is admin
             // if (!req.user.isAdmin) {
@@ -36,7 +37,7 @@ module.exports = (app, redisClient, authMiddleware) => {
                 title,
                 content,
                 createdAt: new Date().toISOString(),
-                author: req.user.id
+                author: req.user.fullName
             };
 
             posts.unshift(newPost); // Add to beginning of array
