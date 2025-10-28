@@ -46,7 +46,14 @@ const Notebook = () => {
             const response = await notebook.get();
             setSheets(response.data.sheets);
             if (response.data.sheets.length > 0) {
-                setSelectedSheet(response.data.sheets[0]);
+                // setSelectedSheet(response.data.sheets[0]);
+                if (selectedSheet) {
+                    setSelectedSheet(prev => {
+                        const uwu = response.data.sheets.find(f => f.id == prev.id);
+                        return uwu;
+                    });
+                }
+                if (!selectedSheet) setSelectedSheet(response.data.sheets[0]);
             }
         } catch (err) {
             setError('Failed to load notebook');
@@ -162,7 +169,19 @@ const Notebook = () => {
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                             <Typography variant="h6">{selectedSheet.title}</Typography>
                             <IconButton onClick={() => setEditMode(!editMode)}>
-                                {editMode ? <SaveIcon /> : <EditIcon />}
+                                {editMode ? <div 
+                                style={{
+                                    backgroundColor: '#ABE7B2', 
+                                    padding: '2px 2px 0', 
+                                    borderRadius: '5px', 
+                                    margin: 0
+                                }}><SaveIcon /></div> : <div 
+                                style={{
+                                    backgroundColor: '#93BFC7', 
+                                    padding: '2px 2px 0', 
+                                    borderRadius: '5px', 
+                                    margin: 0
+                                }}><EditIcon /></div>}
                             </IconButton>
                         </Box>
                         {editMode ? (
