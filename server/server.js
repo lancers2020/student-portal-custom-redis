@@ -51,6 +51,7 @@ require('./routes/academic')(app, redisClient, authMiddleware);
 require('./routes/notebook')(app, redisClient, authMiddleware);
 require('./routes/timeline')(app, redisClient, authMiddleware);
 require('./routes/organization')(app, redisClient, authMiddleware);
+require('./routes/class')(app, redisClient, authMiddleware);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

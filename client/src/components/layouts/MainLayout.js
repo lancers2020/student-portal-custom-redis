@@ -59,6 +59,7 @@ const MainLayout = ({ children }) => {
         { text: 'Timeline', icon: <Timeline />, path: '/timeline' },
         { text: 'Organization', icon: <AccountTree />, path: '/organization' },
         ...(user?.role === 'admin' ? [{ text: 'Data Store', icon: <School />, path: '/datastore' }] : []),
+        ...(user?.role === 'teacher' ? [{ text: 'Class', icon: <School />, path: '/class' }] : []),
         ...(user?.role === 'student' ? [{ text: 'Grades', icon: <School />, path: '/grades' }] : []),
     ];
 

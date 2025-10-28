@@ -2,8 +2,8 @@ module.exports = (app, redisClient, authMiddleware) => {
     // Get all students (admin only)
     app.get('/api/academic/students', authMiddleware, async (req, res) => {
         try {
-            if (req.user.role !== 'admin') {
-                return res.status(403).json({ message: 'Only admins can access student list' });
+            if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+                return res.status(403).json({ message: 'Only admins and teachers can access student list' });
             }
 
             const userKeys = await redisClient.getAllData();
