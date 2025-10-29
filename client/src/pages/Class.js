@@ -471,6 +471,7 @@ const Class = () => {
                             ...formData,
                             students: newValue
                         })}
+                        sx={{padding: '5px'}}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
