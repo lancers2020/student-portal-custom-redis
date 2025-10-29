@@ -9,48 +9,29 @@ import {
     ListItemSecondaryAction,
     IconButton,
     Divider,
-    Button,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
     TextField,
     Alert,
-    Tabs,
-    Tab,
-    Card,
-    CardContent,
-    Grid
+    Button
 } from '@mui/material';
 import {
     Edit as EditIcon,
-    School as SchoolIcon,
     Delete as DeleteIcon,
-    Add as AddIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { academic } from '../services/api';
 
 const DataStore = () => {
     const { user } = useAuth();
-    const [students, setStudents] = useState([]);
-    const [selectedStudent, setSelectedStudent] = useState(null);
-    const [selectedTab, setSelectedTab] = useState(0);
+    const [users, setUsers] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [openGradeDialog, setOpenGradeDialog] = useState(false);
     const [openUserDialog, setOpenUserDialog] = useState(false);
-    const [dialogMode, setDialogMode] = useState('add'); // 'add' or 'edit'
-    const [formData, setFormData] = useState({
-        subjectName: '',
-        grades: {
-            firstGrading: '',
-            secondGrading: '',
-            thirdGrading: '',
-            fourthGrading: ''
-        }
-    });
     const [userFormData, setUserFormData] = useState({
         email: '',
         fullName: '',
@@ -62,53 +43,39 @@ const DataStore = () => {
     });
 
     useEffect(() => {
-        if (user?.role === 'admin') {
-            loadStudents();
-        }
-    }, [user]);
+        loadUsers();
+    }, []);
 
-    const loadStudents = async () => {
+    const loadUsers = async () => {
         try {
-            const response = await academic.getStudents();
-            setStudents(response.data);
+            setLoading(true);
+            const response = await academic.getAllUsers();
+            console.log(':::response', response);
+            setUsers(response.data);
         } catch (err) {
-            setError('Failed to load students');
+            setError('Failed to load users');
+        } finally {
+            setLoading(false);
         }
     };
 
-    const loadStudentGrades = async (studentId) => {
-        try {
-            const response = await academic.getStudentGrades(studentId);
-            setSelectedStudent({
-                ...students.find(s => s.id === studentId),
-                grades: response.data
-            });
-        } catch (err) {
-            setError('Failed to load student grades');
-        }
-    };
-
-    const handleStudentSelect = (studentId) => {
-        loadStudentGrades(studentId);
-    };
-
-    const handleEditUser = (student) => {
+    const handleEditUser = (userToEdit) => {
         setUserFormData({
-            email: student.email,
-            fullName: student.fullName,
-            address: student.address || '',
-            age: student.age || '',
-            role: student.role,
+            email: userToEdit.email,
+            fullName: userToEdit.fullName,
+            address: userToEdit.address || '',
+            age: userToEdit.age || '',
+            role: userToEdit.role,
             password: '',
             confirmPassword: ''
         });
-        setSelectedStudent(student);
+        setSelectedUser(userToEdit);
         setOpenUserDialog(true);
     };
 
     const handleUpdateUser = async () => {
         try {
-            if (!selectedStudent) return;
+            if (!selectedUser) return;
 
             if (userFormData.password && userFormData.password !== userFormData.confirmPassword) {
                 setError('Passwords do not match');
@@ -130,8 +97,8 @@ const DataStore = () => {
                 updateData.password = userFormData.password;
             }
 
-            await academic.updateUser(selectedStudent.id, updateData);
-            await loadStudents();
+            await academic.updateUser(selectedUser.id, updateData);
+            await loadUsers();
             setOpenUserDialog(false);
             setSuccess('User updated successfully');
         } catch (err) {
@@ -152,7 +119,7 @@ const DataStore = () => {
                 setLoading(true);
                 setError('');
                 await academic.deleteUser(userId);
-                await loadStudents();
+                await loadUsers();
                 setSuccess('User deleted successfully');
             } catch (err) {
                 setError(err.response?.data?.message || 'Failed to delete user');
@@ -162,208 +129,87 @@ const DataStore = () => {
         }
     };
 
-    const handleAddSubject = async () => {
-        try {
-            setLoading(true);
-            setError('');
-            console.log(':::formData', formData);
-            const addingGrades = await academic.addSubjectForStudent(selectedStudent.id, { 
-                subjectName: formData.subjectName ,
-                grades: formData.grades
-            });
-            console.log(':::addingGrades', addingGrades);
-            const gettingGrades = await loadStudentGrades(selectedStudent.id);
-            console.log(':::gettingGrades', gettingGrades);
-            setOpenGradeDialog(false);
-            setFormData({
-                subjectName: '',
-                grades: {
-                    firstGrading: '',
-                    secondGrading: '',
-                    thirdGrading: '',
-                    fourthGrading: ''
-                }
-            });
-            setSuccess('Subject added successfully');
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to add subject');
-        } finally {
-            setLoading(false);
+    const getRoleColor = (role) => {
+        switch (role) {
+            case 'admin':
+                return '#d32f2f'; // red
+            case 'teacher':
+                return '#1976d2'; // blue
+            case 'student':
+                return '#388e3c'; // green
+            default:
+                return '#757575'; // grey
         }
-    };
-
-    // Updated to accept the subject data from the form
-    const handleUpdateGrades = async (subjectData) => {
-        try {
-            setLoading(true);
-            setError('');
-            await academic.updateStudentGrades(
-                selectedStudent.id, 
-                subjectData.subjectName, // Use the subjectName from the data
-                subjectData.grades
-            );
-            await loadStudentGrades(selectedStudent.id);
-            setOpenGradeDialog(false);
-            setSuccess('Grades updated successfully');
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to update grades');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDeleteSubject = async (subjectName) => {
-        if (window.confirm('Are you sure you want to delete this subject?')) {
-            try {
-                setLoading(true);
-                setError('');
-                await academic.deleteStudentSubject(selectedStudent.id, subjectName);
-                await loadStudentGrades(selectedStudent.id);
-                setSuccess('Subject deleted successfully');
-            } catch (err) {
-                setError(err.response?.data?.message || 'Failed to delete subject');
-            } finally {
-                setLoading(false);
-            }
-        }
-    };
-
-    const handleEditGrades = (subject) => {
-        setFormData({
-            subjectName: subject.subjectName,
-            grades: { ...subject.grades }
-        });
-        setDialogMode('edit'); // <-- Set mode to 'edit'
-        setOpenGradeDialog(true);
-    };
-
-    const getGradeColor = (grade) => {
-        if (grade === null) return 'default';
-        if (grade >= 90) return 'success';
-        if (grade >= 75) return 'primary';
-        return 'error';
     };
 
     return (
         <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: { xs: 1, sm: 2, md: 3 } }}>
-            <Typography variant="h5" sx={{ mb: 3 }}>Data Store</Typography>
-            
+            <Typography variant="h5" gutterBottom>User Management</Typography>
+
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
-            {/* Users List */}
-            <Grid>
-                <Paper sx={{ mb: 2 }}>
-                    <Typography variant="h6" sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
-                        Users
-                    </Typography>
-                    <List>
-                        {students.map((student) => (
-                            <React.Fragment key={student.id}>
-                                <ListItem
-                                    button
-                                    // selected={selectedStudent?.id === student.id}
-                                    // onClick={() => handleStudentSelect(student.id)}
-                                >
-                                    <ListItemText
-                                        primary={student.fullName}
-                                        secondary={
-                                            <React.Fragment>
-                                                <Typography component="span" variant="body2">
-                                                    {`Role: ${student.role} • Age: ${student.age || 'N/A'}`}
-                                                </Typography>
-                                            </React.Fragment>
-                                        }
-                                    />
-                                    <ListItemSecondaryAction>
-                                        {user.role === 'admin' && (
-                                            <>
-                                                <IconButton
-                                                    edge="end"
-                                                    onClick={() => handleEditUser(student)}
-                                                    sx={{ mr: 1 }}
-                                                >
-                                                    <EditIcon />
-                                                </IconButton>
-                                                <IconButton
-                                                    edge="end"
-                                                    onClick={() => handleDeleteUser(student.id)}
-                                                    color="error"
-                                                    disabled={student.id === user.id}
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </>
-                                        )}
-                                        {(student.role === 'student' || user.role === 'admin') && (
-                                            <IconButton
-                                                edge="end"
-                                                onClick={() => handleStudentSelect(student.id)}
-                                                sx={{ ml: 1 }}
+            <Paper style={{
+                overflow: 'scroll',
+                maxHeight: '80vh'
+            }}>
+                <List>
+                    {users.map((userData) => (
+                        <React.Fragment key={userData.id}>
+                            <ListItem>
+                                <ListItemText
+                                    primary={userData.fullName}
+                                    secondary={
+                                        <>
+                                            <Typography
+                                                component="span"
+                                                variant="body2"
+                                                // color="textPrimary"
+                                                style={{ 
+                                                    color: getRoleColor(userData.role) ,
+                                                    backgroundColor: `${getRoleColor(userData.role)}22`,
+                                                    padding: '2px 6px',
+                                                    borderRadius: '40px',
+                                                    fontSize: '0.65rem',
+                                                    fontWeight: '600',
+                                                    letterSpacing: '0.75px',
+                                                    border: `1px dashed ${getRoleColor(userData.role)}`
+                                                }}
                                             >
-                                                <SchoolIcon />
-                                            </IconButton>
-                                        )}
-                                    </ListItemSecondaryAction>
-                                </ListItem>
-                                <Divider />
-                            </React.Fragment>
-                        ))}
-                    </List>
-                </Paper>
-            </Grid>
-
-            {/* Grade Dialog */}
-            <Dialog open={openGradeDialog} onClose={() => setOpenGradeDialog(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>
-                    {/* Use dialogMode to set the title */}
-                    {dialogMode === 'edit' ? 'Edit Grades' : 'Add New Subject'}
-                </DialogTitle>
-                <DialogContent>
-                    {/* Only show subject name input if in 'add' mode */}
-                    {dialogMode === 'add' && (
-                        <TextField
-                            autoFocus
-                            margin="dense"
-                            label="Subject Name"
-                            fullWidth
-                            value={formData.subjectName}
-                            onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
-                            sx={{ mb: 2 }}
-                        />
-                    )}
-                    <Grid container spacing={2}>
-                        {Object.entries(formData.grades).map(([period, grade]) => (
-                            <Grid item xs={12} sm={6} key={period}>
-                                <TextField
-                                    label={period.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                                    type="number"
-                                    fullWidth
-                                    value={grade}
-                                    onChange={(e) => setFormData({
-                                        ...formData,
-                                        grades: {
-                                            ...formData.grades,
-                                            [period]: e.target.value ? Number(e.target.value) : null
-                                        }
-                                    })}
-                                    inputProps={{ min: 0, max: 100 }}
+                                                {userData.role.toUpperCase()}
+                                            </Typography>
+                                            <div style={{marginTop: '6px'}}>
+                                                {`Email: ${userData.email} • Age: ${userData.age || 'N/A'}`}
+                                                {userData.address && ` • Address: ${userData.address}`}
+                                            </div>
+                                        </>
+                                    }
                                 />
-                            </Grid>
-                        ))}
-                    </Grid>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenGradeDialog(false)}>Cancel</Button>
-                    <Button
-                        // Use dialogMode to select the correct handler and pass formData
-                        onClick={() => dialogMode === 'edit' ? handleUpdateGrades(formData) : handleAddSubject()}
-                        disabled={loading}
-                    >
-                        {loading ? 'Saving...' : 'Save'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                                {user.role === 'admin' && (
+                                    <ListItemSecondaryAction>
+                                        <IconButton
+                                            edge="end"
+                                            onClick={() => handleEditUser(userData)}
+                                            sx={{ mr: 1 }}
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                        <IconButton
+                                            edge="end"
+                                            onClick={() => handleDeleteUser(userData.id)}
+                                            color="error"
+                                            disabled={userData.id === user.id}
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </ListItemSecondaryAction>
+                                )}
+                            </ListItem>
+                            <Divider />
+                        </React.Fragment>
+                    ))}
+                </List>
+            </Paper>
 
             {/* Edit User Dialog */}
             <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
@@ -402,21 +248,18 @@ const DataStore = () => {
                             fullWidth
                             value={userFormData.role}
                             onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })}
-                            SelectProps={{
-                                native: true,
-                            }}
-                            disabled={selectedStudent?.id === user.id} // Prevent changing own role
+                            SelectProps={{ native: true }}
+                            disabled={selectedUser?.id === user.id}
                         >
                             <option value="student">Student</option>
                             <option value="teacher">Teacher</option>
                             <option value="admin">Admin</option>
                         </TextField>
 
-                        <Divider sx={{ my: 1 }}>
-                            <Typography variant="caption" color="text.secondary">
-                                Change Password (Optional)
-                            </Typography>
-                        </Divider>
+                        <Divider />
+                        <Typography variant="subtitle2" color="textSecondary">
+                            Change Password (Optional)
+                        </Typography>
 
                         <TextField
                             label="New Password"

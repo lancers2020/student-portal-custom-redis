@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Box,
     Typography,
@@ -65,6 +65,7 @@ const Class = () => {
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [grades, setGrades] = useState({});
     const [editingGrades, setEditingGrades] = useState(false);
+    const initialGradesRef = useRef({});
 
     const [subjectInput, setSubjectInput] = useState(formData.subjects.join(', '));
 
@@ -148,12 +149,46 @@ const Class = () => {
                 setError('No class selected.');
                 return;
             }
+
             setLoading(true);
             setError('');
+
+            // Find new students by comparing current and previous student lists
+            const currentStudentIds = selectedClass.students.map(s => s.id);
+            const newStudents = formData.students.filter(s => !currentStudentIds.includes(s.id));
+
+            // First, update the class with new students
             await classesApi.updateClassStudents(selectedClass.id, formData.students);
+
+            // Then, initialize subjects for new students
+            if (newStudents.length > 0) {
+                const initializationPromises = newStudents.flatMap(student =>
+                    selectedClass.subjects.map(subject =>
+                        academic.addSubjectForStudent(student.id, {
+                            subjectName: subject.name,
+                            grades: {
+                                firstGrading: null,
+                                secondGrading: null,
+                                thirdGrading: null,
+                                fourthGrading: null
+                            }
+                        })
+                    )
+                );
+
+                try {
+                    await Promise.all(initializationPromises);
+                } catch (initError) {
+                    console.error('Error initializing subjects for new students:', initError);
+                    setError('Students added but there was an error initializing their subjects. Please try editing grades later.');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             await loadClasses();
             setOpenStudentDialog(false);
-            setSuccess('Students updated successfully');
+            setSuccess('Students and their subjects updated successfully');
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to update students');
         } finally {
@@ -171,17 +206,47 @@ const Class = () => {
             const allGradesResponses = await Promise.all(gradePromises);
             const allGradeData = allGradesResponses.map(response => response.data);
             const subjectGrades = {};
-            classData.students.forEach(student => {
-                const studentGrades = allGradeData.map(v => {
-                    return v.find(g => {
-                        return g.studentId === student.id && g.subjectName === subject.name;
-                    });
-                });
-                subjectGrades[student.id] = studentGrades[0]?.grades || null
-            });
+            
+            // Process each student's grades
+            for (const student of classData.students) {
+                const studentGrades = allGradeData.find(grades => 
+                    grades.some(g => g.studentId === student.id)
+                );
+                
+                const existingGrades = studentGrades?.find(g => 
+                    g.studentId === student.id && g.subjectName === subject.name
+                );
 
+                if (!existingGrades) {
+                    // Initialize grades if they don't exist
+                    try {
+                        await academic.addSubjectForStudent(student.id, {
+                            subjectName: subject.name,
+                            grades: {
+                                firstGrading: null,
+                                secondGrading: null,
+                                thirdGrading: null,
+                                fourthGrading: null
+                            }
+                        });
+                        subjectGrades[student.id] = {
+                            firstGrading: null,
+                            secondGrading: null,
+                            thirdGrading: null,
+                            fourthGrading: null
+                        };
+                    } catch (initError) {
+                        console.error(`Error initializing grades for student ${student.id}:`, initError);
+                        // Continue with other students if one fails
+                    }
+                } else {
+                    subjectGrades[student.id] = existingGrades.grades;
+                }
+            }
             
             setGrades(subjectGrades);
+            // store a snapshot of the initial grades so we can detect changes later
+            initialGradesRef.current = JSON.parse(JSON.stringify(subjectGrades || {}));
             setSelectedClass(classData);
             setSelectedSubject(subject);
             setOpenGradingDialog(true);
@@ -197,14 +262,34 @@ const Class = () => {
         try {
             setLoading(true);
             setError('');
+
+            // determine which students actually changed
+            const initial = initialGradesRef.current || {};
+            const changed = Object.entries(grades).filter(([studentId, studentGrades]) => {
+                const initialGrades = initial[studentId];
+                // compare by stringifying — handles nulls and numbers reliably here
+                return JSON.stringify(initialGrades) !== JSON.stringify(studentGrades);
+            });
+
+            if (changed.length === 0) {
+                setSuccess('No changes to save');
+                setEditingGrades(false);
+                return;
+            }
+
+            // only update students that changed
             await Promise.all(
-                Object.entries(grades).map(([studentId, studentGrades]) =>
-                    studentGrades && academic.updateStudentGrades(studentId, selectedSubject.name, studentGrades)
+                changed.map(([studentId, studentGrades]) =>
+                    academic.updateStudentGrades(studentId, selectedSubject.name, studentGrades)
                 )
             );
+
+            // refresh initial snapshot to the latest saved state
+            initialGradesRef.current = JSON.parse(JSON.stringify(grades || {}));
             setSuccess('Grades updated successfully');
             setEditingGrades(false);
         } catch (err) {
+            console.error('Error updating grades:', err);
             setError('Failed to update grades');
         } finally {
             setLoading(false);
