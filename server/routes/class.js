@@ -164,7 +164,7 @@ module.exports = (app, redisClient, authMiddleware) => {
         }
     });
 
-    // Get all students (for teacher's class management)
+    // Get all unassigned students (for teacher's class management)
     app.get('/api/students/all', authMiddleware, async (req, res) => {
         try {
             if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
@@ -172,7 +172,9 @@ module.exports = (app, redisClient, authMiddleware) => {
             }
 
             const allKeys = await redisClient.getAllData();
-            const students = allKeys
+            
+            // First, get all students
+            const allStudents = allKeys
                 .filter(data => {
                     const user = data.value;
                     return user && user.role === 'student';
@@ -182,8 +184,20 @@ module.exports = (app, redisClient, authMiddleware) => {
                     fullName: data.value.fullName,
                     email: data.value.email
                 }));
+                
+            // Then, check which students are not assigned to any class
+            const studentsWithoutClass = await Promise.all(
+                allStudents.map(async (student) => {
+                    const studentClasses = await redisClient.get(`student:${student.id}:classes`, 'json') || [];
+                    // Only include students that have no classes
+                    return studentClasses.length === 0 ? student : null;
+                })
+            );
 
-            res.json(students);
+            // Filter out null values and return only unassigned students
+            const availableStudents = studentsWithoutClass.filter(student => student !== null);
+
+            res.json(availableStudents);
         } catch (error) {
             console.error('Students fetch error:', error);
             res.status(500).json({ message: 'Failed to fetch students' });

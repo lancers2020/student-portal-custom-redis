@@ -187,6 +187,7 @@ const Class = () => {
             }
 
             await loadClasses();
+            await loadAllStudents();
             setOpenStudentDialog(false);
             setSuccess('Students and their subjects updated successfully');
         } catch (err) {
@@ -423,7 +424,6 @@ const Class = () => {
                                 subjects: subjectInput.split(',').map(s => s.trim()).filter(Boolean)
                             });
                         }}
-                        helperText="Enter subject names separated by commas"
                         sx={{ mb: 2 }}
                     />
                     <Autocomplete
@@ -440,8 +440,14 @@ const Class = () => {
                                 {...params}
                                 label="Select Students"
                                 fullWidth
+                                helperText={
+                                    students.length === 0 
+                                        ? "No students available (all students are already assigned to classes)"
+                                        : "Only showing students who aren't assigned to any class"
+                                }
                             />
                         )}
+                        noOptionsText="No unassigned students available"
                     />
                 </DialogContent>
                 <DialogActions>
@@ -470,8 +476,14 @@ const Class = () => {
                                 {...params}
                                 label="Select Students"
                                 fullWidth
+                                helperText={
+                                    students.length === 0 
+                                        ? "No students available (all students are already assigned to classes)"
+                                        : "Only showing students who aren't assigned to any class"
+                                }
                             />
                         )}
+                        noOptionsText="No unassigned students available"
                     />
                 </DialogContent>
                 <DialogActions>

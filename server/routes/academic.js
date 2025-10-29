@@ -26,13 +26,40 @@ module.exports = (app, redisClient, authMiddleware) => {
                 return res.status(403).json({ message: 'Only admins and teachers can access student list' });
             }
 
-            const userKeys = await redisClient.getAllData();
-            const users = userKeys
-                .filter((e) => typeof e.key === 'string' && e.key.startsWith('user:'))
-                .map((e) => ({ ...(e.value || {}), key: e.key }))
-                .filter((v) => v != null && v.role === 'student');
+            // const userKeys = await redisClient.getAllData();
+            // const users = userKeys
+            //     .filter((e) => typeof e.key === 'string' && e.key.startsWith('user:'))
+            //     .map((e) => ({ ...(e.value || {}), key: e.key }))
+            //     .filter((v) => v != null && v.role === 'student');
 
-            res.json(users);
+            // res.json(users);
+            const allKeys = await redisClient.getAllData();
+            
+            // First, get all students
+            const allStudents = allKeys
+                .filter(data => {
+                    const user = data.value;
+                    return user && user.role === 'student';
+                })
+                .map(data => ({
+                    id: data.value.id,
+                    fullName: data.value.fullName,
+                    email: data.value.email
+                }));
+                
+            // Then, check which students are not assigned to any class
+            const studentsWithoutClass = await Promise.all(
+                allStudents.map(async (student) => {
+                    const studentClasses = await redisClient.get(`student:${student.id}:classes`, 'json') || [];
+                    // Only include students that have no classes
+                    return studentClasses.length === 0 ? student : null;
+                })
+            );
+
+            // Filter out null values and return only unassigned students
+            const availableStudents = studentsWithoutClass.filter(student => student !== null);
+
+            res.json(availableStudents);
         } catch (error) {
             console.error('Students fetch error:', error);
             res.status(500).json({ message: 'Failed to fetch students' });
