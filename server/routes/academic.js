@@ -7,17 +7,80 @@ module.exports = (app, redisClient, authMiddleware) => {
             }
 
             const userKeys = await redisClient.getAllData();
-            const students = userKeys
+            const users = userKeys
                 .filter((e) => typeof e.key === 'string' && e.key.startsWith('user:'))
                 .map((e) => ({ ...(e.value || {}), key: e.key }))
                 .filter((v) => v != null);
 
-            console.log('🍬🍬🍬userKeys:', userKeys);
-            console.log('❤️❤️❤️Fetched students:', students);
-            res.json(students);
+            res.json(users);
         } catch (error) {
-            console.error('Students fetch error:', error);
-            res.status(500).json({ message: 'Failed to fetch students' });
+            console.error('Users fetch error:', error);
+            res.status(500).json({ message: 'Failed to fetch users' });
+        }
+    });
+
+    // Update user (admin only)
+    app.put('/api/academic/users/:userId', authMiddleware, async (req, res) => {
+        try {
+            if (req.user.role !== 'admin') {
+                return res.status(403).json({ message: 'Only admins can update user details' });
+            }
+
+            const { userId } = req.params;
+            const updateData = req.body;
+
+            // Get existing user data
+            const existingUser = await redisClient.get(`user:${userId}`, 'json');
+            if (!existingUser) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Hash password if provided
+            if (updateData.password) {
+                const bcrypt = require('bcryptjs');
+                const salt = await bcrypt.genSalt(10);
+                updateData.password = await bcrypt.hash(updateData.password, salt);
+            }
+
+            // Update user data
+            const updatedUser = {
+                ...existingUser,
+                ...updateData,
+                id: userId // Ensure ID remains unchanged
+            };
+
+            await redisClient.set(`user:${userId}`, updatedUser, 'json');
+            res.json({ message: 'User updated successfully' });
+        } catch (error) {
+            console.error('User update error:', error);
+            res.status(500).json({ message: 'Failed to update user' });
+        }
+    });
+
+    // Delete user (admin only)
+    app.delete('/api/academic/users/:userId', authMiddleware, async (req, res) => {
+        try {
+            if (req.user.role !== 'admin') {
+                return res.status(403).json({ message: 'Only admins can delete users' });
+            }
+
+            const { userId } = req.params;
+
+            // Check if user exists
+            const existingUser = await redisClient.get(`user:${userId}`, 'json');
+            if (!existingUser) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Delete user data
+            await redisClient.del(`user:${userId}`);
+            // Also delete associated data like grades
+            await redisClient.del(`units:${userId}`);
+
+            res.json({ message: 'User deleted successfully' });
+        } catch (error) {
+            console.error('User delete error:', error);
+            res.status(500).json({ message: `Failed to delete user, error: ${error}` });
         }
     });
 
@@ -32,7 +95,6 @@ module.exports = (app, redisClient, authMiddleware) => {
             }
 
             const grades = await redisClient.get(`units:${studentId}`, 'json') || [];
-            console.log('❤️❤️❤️Fetched grades for student', studentId, ':', grades);
             const withStudentId = grades.map(v => ({ ...v, studentId }));
             res.json(withStudentId);
         } catch (error) {

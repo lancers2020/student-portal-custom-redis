@@ -36,8 +36,12 @@ export const profile = {
 
 // Academic services
 export const academic = {
-    // Student-specific operations (for admin)
+    // User Management (for admin)
     getStudents: () => api.get('/academic/students'),
+    updateUser: (userId, userData) => api.put(`/academic/users/${userId}`, userData),
+    deleteUser: (userId) => api.delete(`/academic/users/${userId}`),
+    
+    // Student-specific operations (grades)
     getStudentGrades: (studentId) => api.get(`/academic/students/${studentId}/grades`),
     addSubjectForStudent: (studentId, data) => api.post(`/academic/students/${studentId}/subjects`, data),
     updateStudentGrades: (studentId, subjectName, grades) => 

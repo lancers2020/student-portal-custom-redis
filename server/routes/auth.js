@@ -39,8 +39,6 @@ module.exports = (app, redisClient, bcrypt, jwt, JWT_SECRET) => {
                 }
             };
 
-            console.log('✅✅✅Registering new user:', user);
-
             // Store user data
             await redisClient.set(`user:${userId}`, user, 'json');
             await redisClient.set(`email:${email}`, userId);
