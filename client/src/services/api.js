@@ -37,6 +37,7 @@ export const profile = {
 // Academic services
 export const academic = {
     // User Management (for admin)
+    getAllUsers: () => api.get('/academic/users'),
     getStudents: () => api.get('/academic/students'),
     updateUser: (userId, userData) => api.put(`/academic/users/${userId}`, userData),
     deleteUser: (userId) => api.delete(`/academic/users/${userId}`),

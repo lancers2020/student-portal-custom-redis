@@ -1,9 +1,9 @@
 module.exports = (app, redisClient, authMiddleware) => {
-    // Get all students (admin only)
-    app.get('/api/academic/students', authMiddleware, async (req, res) => {
+    // Get all users (admin only)
+    app.get('/api/academic/users', authMiddleware, async (req, res) => {
         try {
-            if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
-                return res.status(403).json({ message: 'Only admins and teachers can access student list' });
+            if (req.user.role !== 'admin') {
+                return res.status(403).json({ message: 'Only admins can access all users' });
             }
 
             const userKeys = await redisClient.getAllData();
@@ -16,6 +16,26 @@ module.exports = (app, redisClient, authMiddleware) => {
         } catch (error) {
             console.error('Users fetch error:', error);
             res.status(500).json({ message: 'Failed to fetch users' });
+        }
+    });
+
+    // Get all students (admin and teacher only)
+    app.get('/api/academic/students', authMiddleware, async (req, res) => {
+        try {
+            if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
+                return res.status(403).json({ message: 'Only admins and teachers can access student list' });
+            }
+
+            const userKeys = await redisClient.getAllData();
+            const users = userKeys
+                .filter((e) => typeof e.key === 'string' && e.key.startsWith('user:'))
+                .map((e) => ({ ...(e.value || {}), key: e.key }))
+                .filter((v) => v != null && v.role === 'student');
+
+            res.json(users);
+        } catch (error) {
+            console.error('Students fetch error:', error);
+            res.status(500).json({ message: 'Failed to fetch students' });
         }
     });
 
@@ -42,14 +62,20 @@ module.exports = (app, redisClient, authMiddleware) => {
                 updateData.password = await bcrypt.hash(updateData.password, salt);
             }
 
+            const isEmailExisting = await redisClient.get(`email:${updateData.email}`, 'string');
+            if (isEmailExisting) {
+                delete updateData.email;
+            }
+
             // Update user data
             const updatedUser = {
                 ...existingUser,
                 ...updateData,
-                id: userId // Ensure ID remains unchanged
+                id: userId
             };
 
             await redisClient.set(`user:${userId}`, updatedUser, 'json');
+            await redisClient.set(`email:${updatedUser.email}`, userId, 'string');
             res.json({ message: 'User updated successfully' });
         } catch (error) {
             console.error('User update error:', error);
@@ -76,6 +102,9 @@ module.exports = (app, redisClient, authMiddleware) => {
             await redisClient.del(`user:${userId}`);
             // Also delete associated data like grades
             await redisClient.del(`units:${userId}`);
+            // Delete auth and email mappings
+            await redisClient.del(`auth:${userId}`);
+            await redisClient.del(`email:${existingUser.email}`);
 
             res.json({ message: 'User deleted successfully' });
         } catch (error) {
@@ -103,10 +132,10 @@ module.exports = (app, redisClient, authMiddleware) => {
         }
     });
 
-    // Add subject for student (admin only)
+    // Add subject for student (admins and teachers only)
     app.post('/api/academic/students/:studentId/subjects', authMiddleware, async (req, res) => {
         try {
-            if (req.user.role !== 'admin') {
+            if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
                 return res.status(403).json({ message: 'Only admins can add subjects' });
             }
 
@@ -118,14 +147,21 @@ module.exports = (app, redisClient, authMiddleware) => {
 
             // Check if subject already exists
             if (units.some(unit => unit.subjectName === subjectName)) {
-                return res.status(400).json({ message: 'Subject already exists' });
+                // return res.status(400).json({ message: 'Subject already exists' });
+                return res.status(201).json({
+                    message: 'Subject added successfully'
+                });
             }
 
             // Create new subject with empty grades
+            const avg = (grades.firstGrading + grades.secondGrading + grades.thirdGrading + grades.fourthGrading) / 4;
+            const isCompleteGradingPeriods = Object.entries(grades).filter(([period, value]) => {
+                return value != null;
+            }).length == 4;
             const newSubject = {
                 subjectName,
                 grades: grades,
-                average: (grades.firstGrading + grades.secondGrading + grades.thirdGrading + grades.fourthGrading) / 4
+                average: isCompleteGradingPeriods ? avg : null
             };
 
             units.push(newSubject);

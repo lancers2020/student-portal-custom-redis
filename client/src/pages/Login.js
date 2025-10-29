@@ -14,8 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
     const navigate = useNavigate();
-    const { user, loading: isAuthLoading } = useAuth();
-    const { login } = useAuth();
+    const { user, loading: isAuthLoading, login } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -37,16 +36,19 @@ const Login = () => {
         try {
             setError('');
             setLoading(true);
-            await login(formData);
-            if (!isAuthLoading) {
-                if (user.role === 'admin') {
-                    navigate('/datastore');
-                } else if (user.role === 'teacher') {
-                    navigate('/class');
-                } else {
-                    // Default for students or general users
-                    navigate('/grades'); 
-                }
+            // login now returns the authenticated user (from AuthContext)
+            const returnedUser = await login(formData);
+            console.log('📦📦📦📦uwu', returnedUser);
+            const roleToUse = returnedUser?.role || user?.role;
+            console.log('📦📦Determined role for navigation:', roleToUse);
+            console.log('📦📦returnedUser:', returnedUser);
+            console.log('📦📦context user:', user);
+            if (roleToUse === 'admin') {
+                navigate('/datastore');
+            } else if (roleToUse === 'teacher') {
+                navigate('/class');
+            } else {
+                navigate('/grades');
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to login');
