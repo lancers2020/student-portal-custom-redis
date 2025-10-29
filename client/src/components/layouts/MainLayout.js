@@ -25,7 +25,7 @@ import {
     Person,
     Logout
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const drawerWidth = 240;
@@ -33,6 +33,7 @@ const drawerWidth = 240;
 const MainLayout = ({ children }) => {
     const theme = useTheme();
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout } = useAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
@@ -72,9 +73,34 @@ const MainLayout = ({ children }) => {
                         button
                         key={item.text}
                         onClick={() => navigate(item.path)}
+                        selected={location.pathname === item.path}
+                        sx={{
+                            '&.Mui-selected': {
+                                backgroundColor: `${theme.palette.primary.main}15`,
+                                borderRight: `3px solid ${theme.palette.primary.main}`,
+                                '&:hover': {
+                                    backgroundColor: `${theme.palette.primary.main}25`
+                                }
+                            }
+                        }}
                     >
-                        <ListItemIcon>{item.icon}</ListItemIcon>
-                        <ListItemText primary={item.text} />
+                        <ListItemIcon
+                            sx={{
+                                color: location.pathname === item.path ? 
+                                    theme.palette.primary.main : 
+                                    'inherit'
+                            }}
+                        >
+                            {item.icon}
+                        </ListItemIcon>
+                        <ListItemText 
+                            primary={item.text}
+                            sx={{
+                                color: location.pathname === item.path ? 
+                                    theme.palette.primary.main : 
+                                    'inherit'
+                            }}
+                        />
                     </ListItem>
                 ))}
             </List>

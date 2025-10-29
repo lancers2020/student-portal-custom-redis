@@ -39,7 +39,7 @@ const Organization = () => {
                     <Grid item xs={12} sm={6} md={4} key={member.id}>
                         <Card>
                             <CardContent sx={{display: 'flex'}}>
-                                <Avatar sx={{height: 100, width: 100, border: '2px solid #5C3E94'}}/>
+                                <Avatar sx={{height: 100, width: 100}}/>
                                 <div>
                                     <Typography variant="h5" sx={{ ml: 2, mt: 2 }}>{member.name}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
@@ -49,7 +49,7 @@ const Organization = () => {
                             </CardContent>
                             <CardContent>
                                 <Typography variant="body2" sx={{ mb: 1 }}>{member.description}</Typography>
-                                <Chip label={`Tenurity: ${member.tenurityYears} years`} color="primary" size="small" sx={{backgroundColor: '#5C3E94'}}/>
+                                <Chip label={`Tenurity: ${member.tenurityYears} years`} color="primary" size="small" sx={{backgroundColor: 'grey', border: '1px dashed lightgrey'}}/>
                             </CardContent>
                         </Card>
                     </Grid>
